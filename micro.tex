@@ -1,0 +1,993 @@
+\% !TEX root = Tarif.tex
+
+\chapter{Modellierung, Umsetzung, Technik} \label{technik}
+
+Es gibt eine Vielzahl von statistischen Optimierungsmethoden, die im Kontext der Tarifkalkulation eingesetzt werden können. Diese Ausarbeitung legt den Schwerpunkt auf die verallgemeinerten Modelle (engl.: Generalized Linear Models\index{Generalized Linear Models} (GLM)), da diese sich als ein Standardwerkzeug zur Tarifgestaltung etabliert haben.
+
+Die Familie der GLM \index{GLM} wurde erstmalig von Nelder und Wedderburn \cite{Nelder} zusammenhängend dargestellt. Wie der Name andeutet, stellen GLMs eine Erweiterung des klassischen linearen Modells dar. Zu der Familie der GLM gehören viele bekannte Modelle wie das Logit-, Probit- oder loglineare Modell. Durch den geschlossenen statistischen Überbau können hierbei explizite Annahmen über die Modellstrukturen als auch modellübergreifende Inferenzaussagen getroffen werden.
+
+Alternativ werden oft folgende Verfahren diskutiert:
+
+\begin{itemize}
+\item Neuronale Netze
+\item Entscheidungsbaumverfahren
+\item Generalized Additive Models
+\end{itemize}
+
+\textbf{Neuronale Netze}\index{Neuronale Netze} sollen die abstrakte Lernfähigkeit des menschlichen Gehirns auf statistische Fragestellungen übertragen, wobei besonders die Eigenschaft interessiert, komplexe Muster ohne vorherige Modellbildung zu lernen.
+Viele Typen von Neuronalen Netzen bzw. ihren Trainingsmethoden gleichen konventionellen statistischen Verfahren bzw. können mit bekannten statistischen Optimierungsverfahren implementiert werden, siehe \cite{Sarle}. Neuronale Netze sind de facto iterative Anwendungen von nichtlinearen Regressionsmodellen wie z.B. GLMs, jedoch ohne statistische Inferenzaussagen ableiten zu können.
+
+\textbf{Entscheidungsbaumverfahren}\index{Entscheidungsbaumverfahren} gehören als sogenannte Schnittebenenverfahren zur Familie der Klassifikationsverfahren. Entscheidungsbäume werden über binäre Aufteilungen der Daten erzeugt, wobei in der Regel die Aufteilung jeweils nur über eine Variable vorgenommen wird. Diese Aufteilungen werden z.B. über die Minimierung der quadratischen Abweichung zwischen Vorhersage und Zielvariablen so gewählt, dass die resultierenden Untermengen möglichst homogen sind.
+Die so in der untersten Ebene entstehenden Blätter können auch als verschachtelte Designmatrizen von linearen Modellen interpretiert werden. Die Verfahrensvorteile liegen in der flexibleren Modellbildung.
+
+\textbf{Generalized Additive Models}\index{Generalized Additive Models} \cite{Hastie} bilden eine natürliche Erweiterung der Verallgemeinerten Linearen Modelle, indem sie die übliche linear-parametrische Modellierung des Prädiktors aufweichen und so nichtparametrische Regressionsansätze bzw. Smoothing- und Bayes-Techniken zulassen. GAMs eignen sich besonders für die explorative Datenanalyse zur Analyse versteckter nichtparametrischer Beziehungen zwischen erklärenden und abhängigen Variablen. Diese Flexibilität in der Modellierung geht einher mit Einschränkungen in der Ableitung von Inferenzaussagen.
+Die Einsatzmöglichkeiten vor allem im Kontext ausschließlich nominal skalierter Tarifmerkmale sind hingegen begrenzt. Ein in der Literatur diskutiertes Anwendungsgebiet ist die Modellierung räumlicher Strukturen (vgl. \ref{Geografische_Glaettungsverfahren}).
+
+
+\section{Univariate Analysen} \index{univariate Analyse} %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Jede statistische Analyse sollte mit einer ausführlichen Prüfung des Datenmaterials beginnen, das neben der klassischen Fehlerprüfung (siehe Kapitel \ref{Pruefung_Daten}) auch z.B. über univariate Analysen eine prinzipielle Idee über grundlegende Wirkungszusammenhänge im Datenmaterial vermitteln soll.
+
+Univariate Analysen geben nur einen ersten Hinweis auf mögliche Wirkungszusammenhänge, die sich unter Umständen in der multivariaten Betrachtung anders darstellen. Das sei an dem folgenden Beispiel skizziert, welches auch als Motivation für die in den folgenden Kapiteln eingeführten multivariaten Verfahren dienen soll.
+
+
+
+\begin{table}
+ \caption{Datenbeispiel für univariate Datenanalyse: Jahreseinheiten, Schadenbedarf}
+ %\footnotesize \sriptsize \tiny
+
+\begin{center}
+\begin{tabular}{c|c|c|c|c|c|c}
+     & \multicolumn{3}{|c|}{Anzahl Jahreseinheiten} & \multicolumn{3}{|c}{Schadenbedarf}     \\
+     & B1  & B2  &  Gesamt  & B1 & B2  & Gesamt   \\ \hline
+
+A1     & 25  & 75  & 100 & 200 & 400 & 350 \\
+A2     & 75  & 25  & 100 & 220 & 420 & 270 \\ \hline
+Gesamt & 100 & 100 & 200 & 215 & 405 & 310 \\
+
+\end{tabular}
+\end{center}
+
+\label{tab:Schadenbedarf}
+ \end{table}
+
+
+
+
+
+Wird nur die Randverteilung betrachtet, liegt der Schadenbedarf der Ausprägung A1 des Merkmals A mit 350 EUR um 80 EUR über dem der Ausprägung A2. Innerhalb der beiden durch die Merkmalsausprägungen von B gegebenen Teilbestände liegt der Schadenbedarf der Ausprägung A1 mit 200 EUR bzw. 400 EUR jeweils leicht unter den Werten von 220 EUR bzw. 420 EUR für die Ausprägung A2.
+
+Diese Verwerfungen beruhen auf dem recht großen Schadenbedarfsunterschied der beiden Merkmalsausprägungen von B, die sich durch die unterschiedliche Bestandsverteilung von B innerhalb der durch A1 bzw. A2 gegebenen Teilbestände auf die Randverteilung von A auswirken.
+
+Das Beispiel zeigt, dass Ergebnisse einer univariaten Analyse vorsichtig zu interpretieren sind, da sie Korrelationen\index{Korrelation} zwischen Variablen sowie auch Interaktionen\index{Interaktion} zwischen den Ausprägungen der Variablen nicht berücksichtigen.
+Um Zusammenhänge zwischen Variablen zu erkennen, können Maßzahlen wie der Pearsonsche Kontingenzkoeffizient oder die Lambda-Maße von Goodman und Kruskal (vgl. \cite{Rinne} und \cite{Hartung}) verwendet werden.
+
+Bei nominal- bzw. ordinalskalierten Merkmalen sind in der Regel nur Aussagen über Abhängigkeiten in der Bestandsverteilung, aber nicht über Abhängigkeiten in Bezug auf die Kennzahlen des Schadenverlaufs möglich.
+Eine Möglichkeit zur Ausschaltung solcher Effekte bei der Betrachtung von univariaten Randverteilungen besteht in der Standardisierung des Bestandes, wie sie im Folgenden Abschnitt beschrieben wird.
+
+
+
+
+
+\section{Gewichtungsverfahren}\index{Gewichtungsverfahren} \label{Gewichtungsverfahren}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Gewichtungsverfahren werden verwendet, um bei einem Vergleich von (Schaden-)Kennzahlen aus verschiedenen (Teil-)Beständen den Einfluss unterschiedlicher Bestandszusammensetzungen auszuschalten.
+
+Das grundlegende Prinzip aller Gewichtungsverfahren ist identisch: Den (Schaden-)Kennzahlen der betrachteten (Teil-)Bestände wird eine einheitliche Bestandszusammensetzung zugrunde gelegt. Die Gewichtungsverfahren unterscheiden sich lediglich in der Auswahl dieser Bestandszusammensetzung.
+So ist der mit den Jahreseinheiten $n^*_t$  des bezogenen Bestandes gewichtete Schadenbedarf $SB_{gew}$ eines Bestandes (mit den Tarifzellen $t$) durch folgende Formel gegeben:
+
+\begin{eqnarray}
+SB_{gew}= \frac{\sum_{t=1}^T SB_t \cdot n^*_t}{\sum_{t=1}^T n^*_t}
+\end{eqnarray}
+
+Das Ergebnis dieser Verfahren ist z.B. der gewichtete Schadenbedarf oder die gewichtete Schadenhäufigkeit eines Bestandes, die mit den entsprechenden gewichteten Kennzahlen aus den anderen betrachteten Beständen verglichen werden kann.
+
+Prinzipiell wird zwischen zwei Anwendungsgebieten mit insgesamt fünf Varianten unterschieden:
+
+\begin{enumerate}
+\item Bestandsvergleich im Zeitablauf (Zeitreihen)
+  \begin{enumerate}
+  \item \textit{Gewichtung nach Paasche:} Die aktuelle Bestandszusammenset-zung wird allen Teilbeständen zugrunde gelegt.
+  \item \textit{Gewichtung nach Laspeyres:} Die Bestandszusammensetzung eines Basiszeitraumes (Basisjahr) wird allen Teilbeständen zugrunde gelegt.
+  \end{enumerate}
+\item Bestandsvergleich innerhalb einer Zeitperiode
+  \begin{enumerate}
+\item \textit{Gewichtung mit Gesamtbestand:} Die Bestandszusammensetzung des Gesamtbestands wird allen betrachteten Teilbeständen zugrunde gelegt.
+\item \textit{Gewichtung mit dem größten Teilbestand:} Die Bestandszusammensetzung des größten Teilbestandes wird allen betrachteten Teilbeständen zugrunde gelegt.
+\item \textit{Gewichtung mit individuellem Bestand:} Die Schadenkennzahlen werden jeweils mit der Bestandszusammensetzung der betrachteten Teilbestände gewichtet. Es ergibt sich pro Teilbestand ein gewichteter Vergleichswert aus dem Gesamtbestand (siehe Regional- und Typenstatistik des GDV).
+  \end{enumerate}
+\end{enumerate}
+
+
+
+\begin{table}
+ \caption{Datenbeispiel für Gewichtungsverfahren}
+ \footnotesize %\sriptsize \tiny
+
+\begin{center}
+\begin{tabular}{c|c|ccc}
+Ausprägung & Ungewichtet  & \multicolumn{3}{c}{Gewichtet mit der Verteilung von B aus}     \\
+                &                   &  Gesamt  & A1 & A2   \\ \hline
+
+A1     & 350,0  & 300,0  & 350,0 & 250,0 \\
+A2     & 270,0  & 320,0  & 370,0 & 270,0 \\ \hline
+Gesamt & 310,0 & 310,0 & 357,5 & 262,5 \\ \hline \hline
+Relativer Abstand von A2 zu A1 &-22,9\% & +6,7\% & +5,7\% & +8,0\% \\
+
+\end{tabular}
+\end{center}
+
+\label{tab:Gewichtung}
+ \end{table}
+
+
+Die nominalen gewichteten Kennzahlen können auf Grund der unterschiedlichen Bestandszusammensetzungen relativ stark schwanken. Die relativen Abstände von A1 zu A2 zeigen aber, dass die verschiedenen Gewichtungsansätze mit einer Spanne von 5,7\% bis 8,0\% zu vergleichbaren relativen Ergebnissen führen.
+
+Entsprechend können keine Pauschalempfehlungen für ein bestimmtes Gewichtungsverfahren getroffen werden. Beim Vergleich verschiedener Teilbestände (z.B. Neukunden- gegen Altkundenbestand) hat es sich etabliert, jeweils die relevanten Kennzahlen des Gesamtbestandes mit den Bestandsverteilungen der Einzelbestände zu gewichten und mit den originären Kennzahlen der Teilbestände zu vergleichen.
+
+So wird einerseits vermieden, dass Ausreißer in den Kennzahlen, die eher in kleinen Teilbeständen auftreten, über größere Bestandsanteile im Gesamtbestand überbewertet werden. Andererseits wird sichergestellt, dass nicht für den Teilbestand untypische Bestandszusammensetzungen zum Vergleich herangezogen werden.
+
+Bemerkung:
+
+Ein Gespür für den theoretischen Hintergrund der Gewichtung gewinnt man am besten, wenn man die Beziehungen in Vektorschreibweise formuliert:
+Sei $\mathbf{sb} = (SB_1; \ldots ; SB_T)$  der Vektor der Schadenbedarfe der einzelnen Zellen des betrachteten Bestandes und  $\mathbf{n} = (n_1; \ldots ; n_T)$  der Vektor die Vertragszahlen bzw. Volumina des betrachteten Bestandes in den Zellen, und $\mathbf{sb}^* = (SB_1^*; \ldots ; SB_T^*)$  bzw.   $\mathbf{n}^* = (n_1^*; \ldots ; n_T^*)$ die entsprechenden Größen des Bezugsbestandes. Mit der $L_1$-Norm $\|\cdot\|_1=\langle\cdot;(1;\ldots;1)\rangle$  schreibt man den Schadenbedarf des betrachteten Bestandes
+
+\begin{eqnarray}
+SB = \frac{\langle \mathbf{sb};\mathbf{n}\rangle}{\|n\|_1}
+\end{eqnarray}
+	
+und den Schadenbedarf des Bezugsbestandes
+	
+\begin{eqnarray}
+SB^* = \frac{\langle \mathbf{sb}^*;\mathbf{n}^*\rangle}{\|n^*\|_1}
+\end{eqnarray}
+
+Diese beiden Größen sind bekanntlich nicht mit einander vergleichbar.
+
+Dagegen ist der Schadenbedarf $SB$ mit dem gewichteten Schadenbedarf
+	
+\begin{eqnarray}
+SB_{{gew}_1} = \frac{\langle \mathbf{sb}^*;\mathbf{n}\rangle}{\|n\|_1}
+\end{eqnarray}
+	
+– das Skalarprodukt bezieht sich auf denselben Vektor  $\frac{\mathbf{n}}{\|n\|_1}$ – vergleichbar.
+
+Ebenso ist der Bezugs-Schadenbedarf $SB^*$ mit dem gewichteten Schadenbedarf
+
+\begin{eqnarray}
+SB_{{gew}_2} = \frac{\langle \mathbf{sb};\mathbf{n}^*\rangle}{\|n^*\|_1}
+\end{eqnarray}
+
+vergleichbar.
+
+Der Vergleich der Größen $SB$  und $SB_{{gew}_1}$  bzw. $SB^*$  und $SB_{{gew}_2}$  ist sinnvoll, wenn $\mathbf{sb}$  und $\mathbf{sb}^*$  parallel sind: Dann stimmt die Struktur des Schadenbedarfes der beiden Bestände überein, diese unterscheiden sich nur im Niveau (siehe insbesondere auch \ref{Globales_Niveau_Regressionsansaetze}). Ein Vergleich der gewichteten Statistiken ist damit also nichts anderes als eine Messung eines unterschiedlichen Niveaus der Schadendaten unter der (meist nicht explizit formulierten) Annahme, dass die Struktur der Schadenbedarfe identisch ist. Bei dieser Interpretation wird klar, dass beide Gewichtungen vom Ansatz her gleich sinnvoll (oder auch fragwürdig!) sind.
+
+Handelt es sich beim gemessenen Bestand um einen kleinen Bestand (z.B. eines kleinen VU oder einen kleinen Teilbestand), so ist es sinnvoll, auf den größeren Bestand (des ganzen VU oder des Marktes) zu gewichten. Damit findet nicht nur eine Umgewichtung im eigentlichen Sinne, sondern auch eine Stabilisierung der Schätzer statt, indem statt des Messwertvektors   der Messwertvektor  eines größeren Bestandes verwendet wird.
+
+
+\section{Ausgleichsverfahren} \label{Ausgleichsverfahren}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Um Auskunft über den individuellen Einfluss der verschiedenen Klassifikationsmerkmale zu erhalten und den Schadenbedarf der einzelnen Zellen des Portfolios mit wenigen Parametern zu beschreiben, wurden Verfahren entwickelt, die unter dem Begriff „Ausgleichsverfahren“ zusammengefasst werden. In der Praxis haben sich additive bzw. multiplikative Modellansätze etabliert:
+
+\begin{eqnarray}  \label{eq:1}
+\mu_{ijk} = \mu + \alpha_i + \beta_j + \gamma_k    \qquad \textnormal{bzw.} \qquad  \mu_{ijk} = \mu \cdot \alpha_i \cdot \beta_j \cdot \gamma_k
+\end{eqnarray}
+
+Der Schadenbedarf wird als eine Funktion der Werte, die den einzelnen Ausprägungen der Merkmale zugeordnet werden, modelliert. Unter dem Ausgleich wird verstanden, dass die Werte so zu bestimmen sind, dass die Unterschiede zwischen beobachteten und unter dem Modell geschätzten Werten in Abhängigkeit gewisser Gütekriterien minimiert werden. Die beiden bekanntesten und historisch bedeutendsten Verfahren sind das Marginalsummen\index{Marginalsummenverfahren}- und das Simon-Bailey-Verfahren\index{Simon-Bailey-Verfahren}, die kurz am Beispiel eines multiplikativen Modells skizziert werden.
+
+Die grundlegende Idee des Marginalsummenverfahrens wird durch die etablierte Forderung, dass in einem guten Tarifsystem für größere Gruppen von Risiken die Summe der geschätzten der Summe der originären Schadenaufwendungen entsprechen sollte, beschrieben.
+
+Diese Forderung kann über das sog. Marginalsummenkriterium formalisiert werden: Für jedes Klassifikationsmerkmal sollen die geschätzten gleich den beobachteten Marginalsummen sein. Die entstehenden Bestimmungsgleichungen lassen sich direkt nach den Parametern auflösen. Für das multiplikative Modell sind die Bestimmungsgleichungen bzw. Marginalsummenbedingungen gegeben durch
+
+\begin{eqnarray}
+ \sum_{j,k=1} \mu_{ijk} =  \sum_{j,k=1} y_{ijk}   \quad \textnormal{für} \quad  i=1,\ldots,I  \textnormal{ . }
+\end{eqnarray}
+
+Die Marginalsummenbedingungen können direkt nach den zu bestimmenden Parametern aufgelöst werden. Da die so entstehenden Bestimmungsgleichungen nicht linear in den Parametern sind, muss die Lösung iterativ ermittelt werden. (siehe z.B. \cite{Mack}). Beim Simon-Bailey-Verfahren wird hingegen folgende  $\chi^2$-Funktion
+
+\begin{eqnarray}
+\chi^2 =\sum_{j,k=1}^{I,J,K} \frac{(y_{ijk} - \mu_{ijk})^2}{\mu_{ijk}} \quad \rightarrow \quad \textnormal{ Minimum }
+\end{eqnarray}
+
+in Abhängigkeit der Modellparameter minimiert. Im Gegensatz zum Marginalsummenverfahren überschätzt das Simon-Bailey-Verfahren in der Summe die beobachteten Werte leicht aber systematisch. Die relative Überschätzung nimmt mit steigender Modellanpassung stetig ab.
+Bis 1992 war das Simon-Bailey-Verfahren das Standard-Verfahren zur Tarifkalkulation im GDV. Es wurde von dem weniger sensibel auf Ausreißer reagierenden Marginalsummenverfahren abgelöst. Dieses ist ein spezielles verallgemeinertes lineares Modell.
+
+
+
+
+\section{Verallgemeinerte Lineare Modelle (GLM)}\label{GLM} \index{GLM} %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Modellformulierung}\label{Modellformulierung}
+
+Das klassische lineare Modell als der bekannteste Vertreter der Familie der GLM ist durch
+
+\begin{eqnarray}
+y_t = \mathbf{x}_t' \bm{\beta} + e_t \quad \textnormal{mit} \quad e_t \sim N(0,\sigma_t^2)
+\end{eqnarray}
+	
+gegeben. Hierbei bezeichnen $y_t$  die Responsevariable\index{Responsevariable}  bzw. $x_t$ den Vektor der nichtstochastischen erklärenden Variablen für die $t$-te der insgesamt $T$ Beobachtungen und $\bm{\beta}$  den zu schätzenden Parametervektor mit insgesamt $P$ Elementen. Weiterhin wird angenommen, dass die unbekannten Störterme $e_t$ und damit auch die Responsevariablen $y_t$  unabhängig normalverteilt sind.
+
+Die Responsevariable $y_t$  kann also in eine systematische Komponente, die durch ihren Erwartungswert $\mu_t$  gegeben ist, und einen Störterm $e_t$ untergliedert werden. Die systematische Komponente $\mu_t$ wird durch eine (in diesem Fall sehr einfache, d.h. lineare) Funktion des linearen Prädiktors beschrieben:
+
+\begin{eqnarray}
+y_t = \mu_t + e_t    \quad \textnormal{mit} \quad   \mu_t = \mathbf{x}_t' \bm{\beta}  \qquad y_t \sim N(\mu_t,\sigma_t^2)
+\end{eqnarray}
+
+Mit dieser Darstellung sind die wichtigsten Eigenschaften eines GLM angesprochen, so wie sie sich im klassischen linearen Modell ausprägen. Allgemein wird ein GLM durch folgende drei Elemente charakterisiert:
+
+Der lineare Prädiktor   als Linearkombination der erklärenden Variablen ist analog dem klassischen linearen Modell gegeben durch:
+
+\begin{eqnarray} \label{eq:2}
+\eta_t = \mathbf{x}_t' \bm{\beta}
+\end{eqnarray}
+
+Eine bijektive, zweimal stetig differenzierbare Link-Funktion\index{Link-Funktion}   beschreibt die Verbindung zwischen dem Erwartungswert   der Responsevariablen und dem linearen Prädiktor  $\eta$ :
+ 	
+\begin{eqnarray}  \label{eq:3}
+g(\mu_t) = \mathbf{x}_t' \bm{\beta}  \quad \textnormal{bzw.} \quad  \mu_t = g^{-1}(\mathbf{x}_t' \bm{\beta})
+\end{eqnarray}
+
+
+Die Dichte- bzw. Wahrscheinlichkeitsfunktion $f(y;\theta;\phi)$ der Responsevariablen gehört zur Familie der einparametrigen natürlichen Exponentialverteilungen\index{Exponentialverteilungen}
+
+\begin{eqnarray}
+f(y;\theta;\phi) = \exp \left[ \frac{y_t \theta_t - b(\theta_t)}{\phi} w_t + c(y_t,\phi.w_t) \right]
+\end{eqnarray}
+
+mit kanonischem Parameter $\theta$  und den Funktionen $b(\cdot)$   und $c(\cdot)$ , die den jeweiligen Verteilungstyp definieren. Die für die Schätzung von $\bm{beta}$ wesentliche Eigenschaft der Verteilung ist neben dem Erwartungswert $\mu$  die Varianzfunktion\index{Varianzfunktion} $V(\mu)$ , die den Einfluss des Erwartungswerts auf die Varianz der Responsevariablen beschreibt:
+
+\begin{eqnarray} \label{eq:4}
+E(y_t) = \mu_t \quad \textnormal{und} \quad Var(y_t) = \frac{\phi}{w_t}V(\mu_t)
+\end{eqnarray}
+
+Der Dispersionsparameter $\phi$  ist konstant über alle Beobachtungen. Er ist z.B. bei der Poissonverteilung mit $\phi=1$  a-priori bekannt oder muss z. B. im klassischen linearen Modell geschätzt werden. Über die Beobachtungsgewichte $w$  kann der Einfluss der Beobachtungen auf das Modell individuell bestimmt werden.
+
+Die Familie der Exponentialverteilungen umfasst sowohl stetige Verteilungen wie die Normal- und Gammaverteilung als auch diskrete Verteilungen wie die Binomial- und Poissonverteilung. Die Wahl einer geeigneten Verteilung ergibt sich oft implizit durch theoretische Modellüberlegungen oder die Struktur des Datenmaterials.
+
+Für jede dieser Verteilungen existiert eine sogenannte kanonische Linkfunktion \index{Linkfunktion}, die vorteilhafte statistische Eigenschaften aufweist und die Modellschätzung vereinfacht. Die Linkfunktion sollte auch den unbeschränkten Wertebereich des linearen Prädiktors auf den gegebenenfalls beschränkten Wertebereich (wie z.B. bei der Binomialverteilung) der Responsevariablen abbilden. Zudem sollte die Modellanpassung bei der Auswahl der Link-Funktion berücksichtigt werden.
+
+
+
+\begin{table}
+ \caption{Varianzfunktion und kanonische Linkfunktion wichtiger GLM}
+ %\footnotesize \sriptsize \tiny
+
+\begin{center}
+\begin{tabular}{c|c|c}
+    Verteilung     &     $V(\mu)$    &   Kanonische Linkfunktion \\ \hline
+Normal		  &  1                   &  $\eta = \mu$ \\
+Poisson		  &  $\mu$            &  $\eta = \ln(\mu)$ \\
+Gamma		  &  $\mu^2$        &  $\eta = \mu^{-1}$ \\
+Invers-Normal	  &  $\mu^3$        &  $\eta = \mu^{-2}$ \\
+Binomial		  &  $\mu(1-\mu)$ &  $\eta = \ln(\mu(1-\mu){-1})$ \\
+
+\end{tabular}
+\end{center}
+
+\label{tab:Linkfunktion}
+ \end{table}
+
+In Tabelle \ref{tab:Linkfunktion} sind die wichtigsten Verteilungen aus der Familie der Exponentialverteilungen mit ihren Varianzfunktionen\index{Varianzfunktion} und kanonischen Linkfunktionen zusammengefasst.
+
+Es sei hier darauf hingewiesen, dass die Gammaverteilung in der Regel in Verbindung mit der logarithmischen Linkfunktion verwendet wird, da die inverse Linkfunktion als kanonische Linkfunktion nicht den unbegrenzten Wertebereich des linearen Prädiktors auf den begrenzten Wertebereich der Gammaverteilung abbildet.
+
+Wie in \cite{Mack} gezeigt wird, ist das in Kapitel \ref{Ausgleichsverfahren} vorgestellte Marginalsummenverfahren ein GLM mit der Varianzfunktion der Poisson-Verteilung und einer logarithmischen Linkfunktion.
+
+
+\subsection{Devianz und verallgemeinerte $\chi^2$-Statistik} \label{section:Devianz}
+
+Jedes GLM definiert eine Log-Likelihood-Funktion $l(y;\hat{\mu}, \phi)$ , die in Abhängigkeit von   maximiert wird. Die numerische Lösung der Maximum-Likelihood-Schätzung kann mit einer iterativen Kleinste-Quadrate-Schätzung (wie z.B. dem Newton-Raphson- oder Fisher-Scoring-Verfahren) erfolgen. Aus der allgemeinen Form der Log-Likelihood-Funktion
+
+\begin{eqnarray}
+l(y;\hat{\mu}, \phi)=\sum_{t=1}^T \ln f(y_t;\hat{\mu}_t, \phi)
+\end{eqnarray}
+
+leiten sich mit der Devianz $D(y;\hat{\mu})$ und der verallgemeinerten  $\chi^2$-Statistik zwei für die Modellbeurteilung zentrale Statistiken ab. Aus ihnen lassen sich wichtige Teststatistiken zur Modellüberprüfung und Schätzer für den Dispersionsparameter konstruieren.
+
+Die Devianz  $D(y;\hat{\mu})$ ist eine Funktion der Differenz zwischen der modell-unabhängigen maximalen Log-Likelihood und der Log-Likelihood des betrachteten Modells und ist definiert durch:
+
+\begin{eqnarray} \label{eq:5}
+D(y;\hat{\mu})=2\phi(l(y;y)-l(y;\hat{\mu}))
+\end{eqnarray}
+
+Der ML-Schätzer (Maximum-Likelihood-Schätzer) für den Parametervektor $\bm{\beta}$   ist gleichzeitig der Devianz-minimierende Schätzer. Jede Varianzfunktion $V(\mu)$  definiert genau eine Devianz-Funktion.
+Die verallgemeinerte  $\chi^2$-Statistik als quadratische Approximation der Devianz ist gegeben durch:
+
+\begin{eqnarray}
+\chi^2(y;\hat{\mu})= \sum_{t=1}^T  \frac{(y_t-\hat{\mu}_t)^2}{V(\hat{\mu}_t)}
+\end{eqnarray}
+
+Aus der verallgemeinerten  $\chi^2$-Statistik wird zudem ersichtlich, dass in die Parameterschätzung lediglich die durch (\ref{eq:4}) gegebene Erwartungswert- und Varianzbeziehung der Exponentialverteilungen eingehen. Die Varianzfunktion bestimmt das Skalenniveau beider Statistiken.
+
+\begin{table}
+ \caption{Varianzfunktion und kanonische Linkfunktion wichtiger GLM}
+ %\footnotesize \sriptsize \tiny
+
+\begin{center}
+\begin{tabular}{c|c}
+Verteilung         &  $D(y;\hat{\mu})$    \\ \hline
+Normal		  &  $ \sum w_t(y_t - \hat{\mu}_t)^2 $                 \\
+Poisson		  &  $ 2 \sum w_t\left(y_t \ln (\frac{y_t}{ \hat{\mu}_t}) - (y_t - \hat{\mu}_t)\right)  $           \\
+Gamma		  &  $ 2 \sum w_t\left(\frac{y_t - \hat{\mu}_t}{ \hat{\mu}_t} - \ln (\frac{y_t}{\hat{\mu}_t})\right)  $         \\
+Invers-Normal	  &  $  \sum w_t \left( \frac{(y_t-\hat{\mu}_t)^2}{y_t\hat{\mu}_t^2}     \right)     $  \\
+
+
+\end{tabular}
+\end{center}
+
+\label{tab:Devianzfunktion}
+ \end{table}
+
+
+Die skalierte Devianz und die skalierte verallgemeinerte $\chi^2$-Statistik ergeben sich durch Division der jeweiligen unskalierten Statistiken durch den Dispersionsparameter:
+
+
+\begin{eqnarray} \label{eq:6a}
+D^*(y;\hat{\mu})=\frac{D(y;\hat{\mu})}{\phi}           
+\end{eqnarray}
+
+bzw.
+
+
+\begin{eqnarray}\label{eq:6b}
+D^*(y;\hat{\mu})=\frac{D(y;\hat{\mu})}{\phi}          
+\end{eqnarray}
+
+Beide skalierte Statistiken folgen unter gewissen Regularitätsannahmen asymptotisch einer  $\chi^2$-Verteilung mit $T-P$  Freiheitsgraden. Aus diesen Zusammenhängen leiten sich zwei konsistente Schätzer für den Dispersionsparameter $\phi$  ab:
+
+\begin{eqnarray}\label{eq:7a}
+\hat{\phi}_D=\frac{D(y;\hat{\mu})}{T-P}           
+\end{eqnarray}
+
+bzw.
+
+\begin{eqnarray}\label{eq:7b}
+\hat{\phi}_D=\frac{D(y;\hat{\mu})}{T-P}          
+\end{eqnarray}
+
+Im klassischen linearen Modell sind Devianz $D(y;\hat{\mu})$   und verallgemeinerte $\chi^2$-Statistik identisch und entsprechen der Summe der Abweichungsquadrate (vgl. Tabelle \ref{tab:Devianzfunktion}). Der Dispersionsparameter $\phi$ entspricht in diesem Fall der unbekannten Varianz $\sigma^2$  der Responsevariablen. Aus (\ref{eq:5}) leitet sich auch die Verallgemeinerung des Likelihood-Ratio-Tests (vgl. Kap. \ref{Inferenzanalyse}) zum Vergleich zweier geschachtelter Modelle ab.
+
+
+
+\subsection{Auswahl der Verteilungsannahme} \index{Verteilungsannahme}
+
+Wie oben erwähnt, ist die für die Schätzung von  $\bm{\beta}$  (also der Tariffaktoren) wesentliche Eigenschaft der Verteilung die Varianzfunktion $V(\mu)$ , die den Einfluss des Erwartungswerts auf die Varianz der Responsevariablen beschreibt. Daher ist es eigentlich richtiger zu sagen, dass man keine Verteilung annimmt, sondern nur eine Proportionalität zwischen Erwartungswert und Varianz (siehe auch \ref{QuasiLikelihood}).
+
+Möchte man das Verhältnis zwischen Erwartungswert und Varianz aus den Daten ermitteln, um eine geeignete Verteilung auszuwählen, kann wie folgt vorgegangen werden.
+
+Hierzu wird die Formel, welche die Beziehung zwischen Erwartungswert und Varianz beschreibt, umgeformt:
+
+\begin{eqnarray}
+Var(y_t) &=& \frac{\phi}{w_t}V(\mu_t)\\
+Var(y_t) &=& \frac{\phi}{w_t}E(y_t)^\tau\\
+\ln(Var(y_t)w_t) &=& \tau \ln(E(y_t)) + \ln(\phi)
+\end{eqnarray}
+
+Obige Gleichung bildet nun eine klassische Regressionsgleichung 
+
+\begin{eqnarray}
+y=ax+b    \qquad \textnormal{mit} \quad  a=\tau \quad \textnormal{und} \quad b=\ln(\phi).
+\end{eqnarray}
+ 
+Zunächst wird der Datenbestand auf die Tarifzellen und die zur Verfügung stehenden Statistikjahre bezüglich der Zielgröße verdichtet. Die Terme  $Var(y_t)$  und  $E(y_t)$ werden danach für alle Tarifzellen berechnet. Ist zum Beispiel die Zielgröße des GLM der Schadenbedarf, so ist mit $Var(y_t)$  die Varianz eines Schadenbedarfs einer Tarifzelle über die Statistikjahre gemeint.
+
+Hat also eine Tarifzelle die beobachteten Schadenbedarfe 480 EUR (2005), 500 EUR (2006), 510 EUR (2007) und 650 EUR (2008), so ist  $Var(y_t)$ = 6033,3 und  $E(y_t)$ = 535 EUR. Nach $Var(y_t)$ werden die berechneten Werte sortiert und mit der klassischen Regression gefittet.
+
+Sind die Schadenfrequenz oder der Schadendurchschnitt die Zielgrößen des GLM, so können $Var(y_t)$  und  $E(y_t)$  auch aus den Einzeldaten errechnet werden, da sich bei Faltung\index{Faltung} – also bei der Verdichtung auf die Tarifzellen – das Verhältnis zwischen Erwartungswert und Varianz bei den diskutierten Verteilungen nicht ändert. Es kann aber auch wie beim Schadenbedarf vorgegangen werden, d.h. es werden die beobachteten Schadenfrequenzen beziehungsweise Schadendurchschnitte einer Tarifzelle betrachtet.
+
+Hat $\tau$ dann einen Wert nahe 1, wird man sich für die Poissonverteilung entscheiden, ist  $\tau$ nahe 2 für die Gammaverteilung. Für Werte von $\tau$  zwischen 1 und 2 bieten Tweedie-Verteilungen eine alternative Wahl (siehe Abschnitt \ref{Tweedie}).
+
+Man sollte sich immer vor Augen halten, dass man bei einem GLM keine Verteilung anpasst, wie es zum Beispiel die Rückversicherungsaktuare tun, wenn sie eine Großschadenverteilung anpassen. 
+
+Selbst wenn man in einem GLM zur Tarifkalkulation eine nicht bestmöglich zu den Daten passende Verteilung wählt, werden die Ergebnisse nicht völlig falsch, aber wesentlich ungenauer. Um die Auswirkung der Verteilungsannahme auf die Schätzungen einzuschätzen, betrachtet man folgende Gleichungen:
+
+Poisson-Annahme:  $V(\mu_t) = \mu_t = E(y_t)$  und  $\frac{Var(y_t)}{ E(y_t)}w_t=\phi$
+ 
+Gamma-Annahme:  $V(\mu_t) = \mu_t^2 = E(y_t)^2$  und  $\frac{Var(y_t)}{ E(y_t)^2}w_t=\phi$
+ 
+Bei der Gammaverteilung nimmt – die gleiche Tarifzelle vorausgesetzt – die vom GLM angenommene Varianz gegenüber der Poissonverteilung quadratisch zu. Das heißt, dass bei der Gammaverteilung Tarifzellen mit niedrigerem  $E(y_t)$ genauer angepasst werden. Die Poissonverteilung würde hingegen höhere $E(y_t)$  genauer anpassen, da die angenommene Modellvarianz niedriger ist.
+
+
+\subsection{Overdispersion} \label{Overdispersion}   \index{Overdispersion}
+
+Anzumerken ist, dass die Qualität der Modellanpassung einen nicht zu unterschätzenden Einfluss auf die Schätzung des Dispersions"=Parameters $\phi$  hat. Mit schlechterer Modellanpassung nimmt tendenziell der Anteil der systematischen Variation, die eigentlich durch das Modell erklärt werden sollte, zu, so dass der Schätzwert für $\phi$  ansteigt.
+
+Weiterhin können Extremwerte bzw. Ausreißer die Schätzung von $\phi$  dominieren. Hier ist die Entscheidung, ob eher eine Datenkupierung oder eine andere Verteilung bzw. Link-Funktion in Betracht gezogen werden sollte, nicht immer einfach.
+
+Ein nicht der Erwartung entsprechender Schätzwert für $\phi$  kann seine Ursache neben nicht adäquaten Verteilungsannahmen also auch in einer schlechten Modellanpassung haben, was bei der Interpretation von Inferenzaussagen – insbesondere bei einer schrittweisen Merkmalsauswahl – zu berücksichtigen ist. 
+
+Es bietet sich an, den Dispersionsparameter – sobald die Verteilungsannahmen getroffen wurden – aus dem maximalen betrachteten Modell zu schätzen und für alle weiteren Analysen als fix zu übernehmen.
+
+
+\subsection{Power-Varianz- und Power-Link-Funktionen}
+
+Für die Auswahl der optimalen Link- bzw. Varianzfunktion ist es hilfreich, dass alle relevanten Link- und Varianzfunktionen (siehe \ref{Modellformulierung}) zu der Familie der Power-Link-Funktionen $\eta(\mu;\xi)$  bzw. Power-Varianz-Funktionen $V(\mu;\psi)$  zählen:
+
+\begin{eqnarray} \label{eq:8a}
+\eta(\mu;\xi)=\left\{ \begin{array}{r@{\quad \textnormal{für} \quad}l}
+\mu^\xi & \xi \neq 0\\
+\log(\mu) & \xi = 0
+\end{array} \right. 
+\end{eqnarray}
+
+bzw.
+
+\begin{eqnarray}\label{eq:8b}
+V(\mu;\psi)=\mu^\psi  \quad \textnormal{für} \quad \psi \geq 0
+\end{eqnarray}
+
+
+Wie aus Tabelle \ref{tab:Power_link} zu ersehen ist, umfasst die Familie der Power-Link- bzw. Power-Varianz-Funktionen alle wichtigen GLM in ihren kanonischen Formen.
+
+\begin{table}
+ \caption{GLM mit Power-Link- bzw. Power-Varianz-Funktionen}
+ %\footnotesize \sriptsize \tiny
+\begin{center}
+\begin{tabular}{c|c|c}
+Verteilung         &  $V(\mu;\psi)$  & $\eta(\mu;\xi)$    \\ \hline
+Normal		  &  $ \psi= 0 $   &  $\xi=1$            \\
+Poisson		  &  $ \psi= 1 $   &  $\xi=0$            \\
+Gamma		  &  $ \psi= 2 $   &  $\xi=-1$            \\
+Invers-Normal	  &  $ \psi= 3 $   &  $\xi=2$            \\
+\end{tabular}
+\end{center}
+\label{tab:Power_link}
+ \end{table} 
+
+Für die technische Umsetzung ist es hilfreich, dass für Power-Varianz-Funktionen die Devianz (\ref{eq:5}) direkt in Abhängigkeit von $\psi$  ausgedrückt werden kann, wobei die Link-Funktion über die Erwartungswertbeziehung aus (\ref{eq:3}) implizit in $\mu_t$  enthalten ist: (mit $\psi \neq 1,2$)
+
+\begin{eqnarray}  \label{eq:9}
+D_Q(y;\mu,\xi,\psi)=2 \sum_{t=1}^T w_t \left[ - \frac{y_t}{1-\psi} ( \mu_t^{1-\psi} - y_t^{1-\psi} +  \frac{1}{2-\psi} ( \mu_t^{2-\psi} - y_t^{2-\psi}    \right] 
+\end{eqnarray}
+
+Für die beiden Ausnahmen $\psi = 1,2$  sei auf die Devianz-Formeln in Tabelle 10 verwiesen. Die Sensitivität von Modellen gegenüber inkrementellen Änderungen in der Varianz- und Link-Funktion kann analytisch und grafisch über die Veränderungen der skalierten Quasi-Devianz
+
+\begin{eqnarray}  
+D^*_Q(y; y,\xi,\psi)= \frac{D_Q(y; y,\xi,\psi)}{\phi} + \sum_{t=1}^T \ln[\phi V(y_t)]
+\end{eqnarray}
+ 
+beurteilt werden. Zu dem ersten Term der skalierten Devianz aus (\ref{eq:9}) wird ein von der Modellschätzung unabhängiger Korrekturfaktor addiert, der erst den Vergleich über verschiedene Varianzfunktionen ermöglicht.
+
+\begin{figure}  %alt:Abb_10
+	\centering
+  \includegraphics[width=1\textwidth]{grafik/Devianzprofile.png}
+      \caption{Devianz-Profile für zwei Link-Funktionen und dreidimensionales Devianz-Profil}
+	\label{fig:Devianzprofile}
+	
+\end{figure} 	 
+
+
+
+Die Veränderung der skalierten Quasi-Devianz $D^*_Q(y; y,\xi,\psi)$  in Abhängigkeit von $\xi$  bzw. $\psi$  lässt sich anschaulich in Devianz-Profil-Plots abbilden. Abbildung \ref{fig:Devianzprofile} (links) zeigt ein zweidimensionales Devianz-Profil für zwei gegebene $\xi$ bei variierenden $\psi$. Abbildung \ref{fig:Devianzprofile} (rechts) zeigt ein drei-dimensionales Devianz-Profil bei der simultanen Variation von $\xi$  und $\psi$.
+Alle Kombinationen von $\xi$ und $\psi$  aus der Familie der Power-Link- bzw. Power-Varianz-Funktionen aus (\ref{eq:8a}) und (\ref{eq:8b}), die zu keiner Verteilung aus der Exponentialfamilie gehören, werden als Quasi-Likelihood-Modelle bezeichnet.
+
+
+\subsection{Quasi-Likelihood}\label{QuasiLikelihood}
+
+Da aus den Verteilungsannahmen lediglich die Erwartungswert- und Varianzbeziehungen aus (\ref{eq:4}) in die Modellschätzung eingehen, gelten für die Parameterschätzer alle wesentlichen Eigenschaften der GLM-Schätzer auch ohne Verteilungsannahme zumindest asymptotisch.
+
+Diese sogenannten Quasi-Likelihood-Modelle ermöglichen es, z.B. ein multiplikatives Modell mit konstantem Variationskoeffizienten (Power-Link-Funktion und Power-Varianz-Funktion mit $\xi=0$  und $\psi=2$ ) zu schätzen, ohne sich über Verteilungsannahmen tiefgreifende Gedanken machen zu müssen.
+
+Aufgrund seiner Analogie zum Marginalsummenverfahren wird das \textit{log"=lineare Poisson"=Modell} gerne herangezogen, auch wenn die Grundannahme des Poissonmodells, dass die Varianz gleich dem Erwartungswert ist, in praktischen Anwendungen nicht immer gehalten werden kann. 
+
+Solange sich die Varianz aber zumindest proportional zum Erwartungswert entwickelt, kann diese \textit{Overdispersion} (siehe \ref{Overdispersion}) über einen entsprechend größeren Dispersions-Parameter $\phi$  abgebildet werden, der im klassischen Poisson-Modell gleich 1 sein sollte. So erhält man im Rahmen der Quasi-Likelihood-Schätzung weiterhin belastbare Inferenzaussagen.
+
+\subsection{Parametrisierung und Merkmalsschachtelung}
+
+Bei Klassifikationsmerkmalen mit qualitativen Merkmalsausprägungen müssen ihre Ausprägungen (Faktorstufen) binär kodiert werden, um die Faktornotation aus z.B. (\ref{eq:1}) in die Matrixnotation aus z.B. (\ref{eq:2}) zu überführen.
+
+Bei den drei Klassifikationsmerkmalen $\alpha$, $\beta$ und $\gamma$  aus (\ref{eq:1}) wird jeder ihrer insgesamt $I+J+K$  Ausprägungen eine Binärvariable zugeordnet, die das Vorliegen bzw. Nicht-Vorliegen der betreffenden Ausprägung anzeigt. Jede Beobachtung inklusive Konstante wird demnach durch einen Designvektor mit $I+J+K+1$  Elementen beschrieben, von denen genau 4 Elemente den Wert $1$ und alle anderen Elemente den Wert $0$ annehmen.
+
+Der Rang der durch die Kodierung entstehenden Designmatrix ist kleiner als die Anzahl der Modellparameter; damit sind die Parameter nicht eindeutig identifizierbar. Um eine Schätzung zu ermöglichen, müssen Restriktionen in das Modell eingeführt bzw. muss das Modell reparametrisiert werden.
+
+Zwei klassische Methoden sind die sum-to-zero-Beschränkungen\index{sum-to-zero-Beschränkungen} und die Corner-Point-Parametrisierung\index{Corner-Point-Parametrisierung}. Die sum-to-zero-Beschränkungen erweitert das Modell um die Restriktion, dass die Summe alle Parameter eines Merkmals gleich Null ist:
+
+
+\begin{eqnarray}  
+\sum_i^I \alpha_i = \sum_j^J \beta_j =\sum_k^K \gamma_k
+\end{eqnarray}
+ 
+Die Kodierung erfolgt über die Änderung der Designmatrix $\bm{X}$  um je eine Zeile pro Merkmal, die diese Restriktionen beinhalten. Diese Reparametrisierungsart hat den Vorteil, dass sich Modelle der Art
+
+
+\begin{eqnarray}  
+\eta_{ijk} = \mu + \alpha_i + \beta_j + \gamma_k
+\end{eqnarray}
+
+ darstellen lassen. Die Parameter stellen je nach Merkmalsausprägung einen Auf- bzw. Abschlag zu einem Referenzwert $\mu$  dar.
+
+Bei der Corner-Point-Parametrisierung wird der Parametersatz durch Streichung von Spalten aus der Designmatrix so verkleinert, dass der Rang der Designmatrix mit der Anzahl der verbleibenden Parameter übereinstimmt. Dabei wird von jedem Klassifikationsmerkmal genau eine Ausprägung bzw. ein Designvektor eliminiert.
+
+Die Modellkonstante entspricht bei der Corner-Point-Parametrisierung einem Referenzwert, der durch die eliminierten Ausprägungen, d.h. gestrichenen Parameter, definiert wird. Alle anderen Parameter stellen wiederum Auf- bzw. Abschläge zu dem Parameterwert dieser Referenzzelle dar.
+
+Die Corner-Point-Parametrisierung lässt durch die Wahl der Referenzzelle viel Spielraum bei der Gestaltung der Designmatrix. Entsprechend ist bei der Interpretation der Parameterschätzer bzw. ihrer Varianzen Vorsicht geboten, da sie immer relativ zur gewählten Referenzkategorie zu sehen sind.
+
+Die Art der Parametrisierung beeinflusst lediglich die Parameterschätzer und ihre Varianzen, aber nicht die Prognosequalität oder die Modellanpassung insgesamt. Auf Grund der Normalverteilungseigenschaften der Parameterschätzer (siehe nachfolgende Formel (10)) ist über die Beziehung
+
+\begin{eqnarray}  
+E(X \pm Y) &=& E(X) \pm E(Y)  \quad  \textnormal{bzw.} \nonumber \\  
+Var(X \pm Y) &=& Var(X) + Var(Y) \pm 2 \cdot Cov)(X,Y)
+\end{eqnarray}
+ 
+eine nachträgliche manuelle Umstellung der Parametrisierung mit entsprechender Berechnung der neuen Kovarianz-Matrix problemlos möglich. Eine Darstellung von Interaktionseffekten oder geschachtelten Merkmalen ist ebenso möglich, indem die entsprechenden Merkmalsausprägungen miteinander verknüpft werden. 
+
+Soll z.B. in einem Kraftfahrttarif das Merkmal \textit{Garage Ja/Nein} in Abhängigkeit von dem Merkmal \textit{Junger Fahrer Ja/Nein} modelliert werden, können beide Merkmale durch die Permutation ihrer Ausprägungen in einem neuen Merkmal \textit{Garage-Junger Fahrer} mit den Merkmalsausprägungen \textit{Ja-Ja}, \textit{Ja-Nein}, \textit{Nein-Ja} und \textit{Nein-Nein} abgebildet werden.
+
+Kompliziertere Designs, wie z.B. die Modellierung des Merkmals \textit{Garage Ja/Nein} in Abhängigkeit von drei Typklassengruppen \textit{10-14}, \textit{15-19} bzw. \textit{20-25}, können durch die Zwischenschaltung eines Hilfsmerkmals, das je nach Typklasse eine der drei Ausprägungen annimmt, entwickelt werden. Das Hilfsmerkmal wird dann – wie einführend skizziert – mit dem Merkmal \textit{Garage Ja/Nein} zu dem letztendlichen Tarifmerkmal verknüpft. Das Merkmal \textit{Typklasse} bleibt in seiner ursprünglichen Struktur erhalten.
+
+\subsection{Zielgröße in der Tarifkalkulation: Schadenhöhe und Schadenhäufigkeit versus Schadenbedarf}
+
+In der Regel wird als interessierende Zielgröße in einem GLM der Schadenbedarf als letztendlich interessierende Größe direkt modelliert. Auf Grund des bekannten Zusammenhangs $SB=SH \cdot SD$ ist es auch möglich, zwei verschiedene Modelle für die einzelnen Zielgrößen anzupassen und die Ergebnisse, d.h. die Schätzer für die jeweiligen Zielvariablen, multiplikativ zusammenzuführen. 
+
+Hierbei können beide Modelle komplett unterschiedliche Modellstrukturen – sowohl in Bezug auf Link- und Varianzfunktion als auch weitgehend in Bezug auf den linearen Prädiktor – haben. Je mehr sich die Modellstrukturen ähneln, desto einfacher können Inferenzaussagen über das zusammengesetzte Modell zumindest näherungsweise abgeleitet werden. Die Annahme der Unabhängigkeit beider Teilmodelle stellt hierbei eine wesentliche Vereinfachung dar. 
+
+Oftmals werden sich die Resultate in Bezug auf die Schätzer für die Zielgröße der beiden alternativen Vorgehensweisen
+\begin{itemize}
+\item Zielgröße $SB$  über $SH$  und $SD$ separat modellieren, Ergebnisse multiplikativ zusammenführen bzw.
+\item Zielgröße $SB$   direkt modellieren
+\end{itemize}
+sehr ähnlich sein, was letztendlich auch nicht unerwartet ist.
+
+Damit sind auch die Vorteile der direkten Modellierung des $SB$  offenkundig: Es muss nur ein GLM angepasst werden, und überdies stehen die üblichen Inferenzstatistiken für alle Modellaspekte „direkt“ zur Verfügung, was bei der separaten Modellierung der (Hilfs)-Zielgrößen $SH$  und  $SD$ nur sehr eingeschränkt der Fall ist.
+
+Andererseits gibt es auch Gründe für die separate Modellierung von $SH$  und $SD$: Sie verbessert das Verständnis, auf welche Weise die erklärenden Variablen auf die einzelnen Komponenten der letztendlich interessierende Zielgröße Schadenbedarf wirken. So zeigen die Erfahrungen aus der Praxis, dass eigentlich in allen Versicherungssparten die Schadenhäufigkeit recht gut modelliert werden kann, während die Schadenhöhe offensichtlich mehr von externen, nicht direkt greifbaren Faktoren beeinflusst wird. Nähere Information hierzu sind in \cite{Anderson} zu finden.
+
+
+\subsection{Inferenzanalyse und Signifikanztests}\label{Inferenzanalyse}\index{Signifikanztest}
+
+Bei der Anpassung eines verallgemeinerten linearen Modells an reale Daten werden aus den tatsächlichen Beobachtungen sowie der Annahme über die Modellform die Parameterschätzungen, die für die betreffende Modellform am besten zu den Daten passen, bestimmt. Hierbei werden nicht automatisch Informationen über die Angemessenheit des Modells und der Schätzwerte geliefert. Somit ist es hilfreich, die statistischen Modelleigenschaften zur Inferenzanalyse bzw. zur Konstruktion von Signifikanztests zu nutzen.
+
+\subsubsection{Allgemeine Vorgehensweise bei Signifikanztests}
+
+Jeder Signifikanztest basiert auf der Formulierung einer Hypothese $H_0$  (z.B. Übereinstimmung von zwei Mittelwerten) und einer entsprechenden Gegenhypothese  $H_1$ (in diesem Fall: Nicht-Übereinstimmung von zwei Mittelwerten), deren Gültigkeit überprüft werden soll. 
+
+Dabei soll eine fälschliche Ablehnung der Hypothese nur mit einer vorzugebenden maximalen (Irrtums-) Wahrscheinlichkeit - dem sogenannten \textit{Signifikanzniveau} $\alpha \in (0,1)$ - vorkommen. Zu beachten ist, dass in der Hypothese $H_0$  nur Gleichheitshypothesen (also $=$, $\leq$ oder $\geq$) und in der Hypothese $H_1$  die entsprechenden Komplementärhypothesen (also $\neq$, $>$ oder $<$) formuliert werden.
+
+Unter Verwendung einer geeigneten zufallsabhängigen Teststatistik $T$ , die im günstigsten Fall zumindest approximativ einer gängigen Verteilung folgt, und dem Signifikanzniveau $\alpha \in (0,1)$ , wird ein Bereich $ABL_\infty$ so konstruiert, dass gilt
+
+\begin{eqnarray}  
+P(T \in ABL_\infty | H_0 \quad \textnormal{wahr}) \leq \alpha
+\end{eqnarray}
+
+Damit erhält man als Testvorschrift
+
+
+\begin{eqnarray} 
+H_0 \quad \left\{ \begin{array}{r@{\quad \textnormal{, falls} \quad}l}
+\textnormal{ablehnen} & T \in ABL_\alpha\\
+\textnormal{nicht ablehnen} & T \not\in ABL_\alpha\\
+\end{array} \right. 
+\end{eqnarray}
+
+Da im Gegensatz zum vorgegebenen Signifikanzniveau $\alpha$  (oder auch maximaler Fehler 1. Art –  $H_0$ ablehnen, obwohl  $H_0$ richtig ist) die Wahrscheinlichkeit, dass  $H_0$ beibehalten wird, obwohl diese falsch ist (Fehler 2. Art) in der Regel nicht kontrollierbar ist, werden die zu testenden Aussagen als Gegenhypothese $H_1$  formuliert. Im Falle einer Ablehnung von $H_0$  lässt sich dann die Wahrscheinlichkeit des Fehlers, den man möglicherweise macht, auf das Signifikanzniveau beschränken.
+
+\subsubsection{Konfidenzintervalle und klassische Parametertests}
+
+Jedes GLM definiert eine Log-Likelihood-Funktion $l(y;\hat{\mu},\phi)$ , die in Abhängigkeit von $\bm{\beta}$  maximiert wird. Aus dem Iterationsprozess zur numerischen Lösung dieses ML-Problems leitet sich direkt die Kovarianzmatrix des zu schätzenden Parametervektors $\bm{\beta}$  ab:
+
+Diese Normalverteilungseigenschaften des Schätzers für  $\bm{\beta}$
+
+\begin{eqnarray}   \label{eq:10}
+\bm{\hat{\beta}} \sim  N(\bm{\beta},\bm{\Sigma_{\beta\beta'}}   \quad \textnormal{mit } \quad   \bm{\Sigma_{\beta\beta'}}  &=& \phi(\bm{X' G^{-1} X)^{-1}}     \quad \textnormal{und} \quad  \nonumber \\ g_{tt} &=& \frac{V(\mu_t)(g'(\mu_t))^2}{w_t}
+\end{eqnarray}
+
+
+vereinfachen natürlich Inferenz- und Konfidenzaussagen. Entsprechend gilt 
+
+\begin{eqnarray}  
+\hat{\mu}_t=g^{-1}(\bm{x'}_t \bm{\hat{\beta}}   \quad \textnormal{mit } \quad   \sigma_{\mu_t}^2 = \bm{x'}_t  \bm{\Sigma_{\beta\beta'}}  \bm{x}_t
+\end{eqnarray}
+
+und es lassen sich asymptotisch die klassischen Normalverteilungs"=Konfidenzintervalle für $\beta_i$  konstruieren:  
+
+\begin{eqnarray}
+[ \hat{\beta_i} - z_{1-\alpha/2} \sqrt{Var(\hat{\beta_i}}  ;  \hat{\beta_i} + z_{1-\alpha/2} \sqrt{Var(\hat{\beta_i}} ]
+\end{eqnarray}
+ 
+Dementsprechend erhält man als asymptotische (wegen der Linkfunktion nicht notwendigerweise symmetrische) Konfidenzintervalle für  $\mu_i$: 
+
+\begin{eqnarray}
+[g^{-1}(\bm{x_i \hat{\beta}}-z_{1-\alpha/2}\sigma_{\mu_i})  ;  g^{-1}(\bm{x_i \hat{\beta}}+z_{1-\alpha/2}\sigma_{\mu_i})
+\end{eqnarray}
+
+Hierbei bezeichnen $z_p$  die jeweiligen Perzentile der Standard-Normalverteilung. Analog bietet sich der klassische Parametertest, dessen Teststatistik unter Gültigkeit der  $H_0$-Hypothese asymptotisch normal-verteilt ist, für die Beurteilung einzelner Modellparameter an:
+
+\begin{eqnarray} \label{eq:11} 
+H_0: \quad \beta_i=\beta_j \quad , \quad \textnormal{mit} \quad \frac{\hat{\beta}_i - \hat{\beta}_j}{\sqrt{var(\hat{\beta}_i - \hat{\beta}_j)}}  \sim N(0,1)
+\end{eqnarray}
+
+In Statistikpaketen werden standardmäßig Teststatistik für den Test von $\beta_i$  gegen 0 ausgewiesen. Wegen Gültigkeit von 
+
+\begin{eqnarray} 
+Z_i \sim N(0;1) \Longrightarrow \sum_{i=1}Î Z_i^2 \sim \chi_I^2
+\end{eqnarray}
+  
+wird gelegentlich auch das Quadrat der Teststatistik aus (\ref{eq:11}) ausgewiesen. Diese Verallgemeinerung führt zu den sog. Kontrasten, d.h. Tests auf Linearkombinationen von Parametern. Die Hypothese $H_0: \beta_i=\beta_j$  kann zu $H_0: 1\cdot\beta_i - 1\cdot\beta_j=0$  bzw.  $ (\bm{L'\beta})=0$ mit $\bm{L'} = (0,\cdots,1,0,\cdots-1,\cdots,0)$  umgestellt werden. Allgemein gilt 
+
+\begin{eqnarray} 
+S = (\bm{L'\beta}) (\bm{L'\Sigma L})^{-1} (\bm{L'\beta}) \sim \chi_{rg(L)}^2
+\end{eqnarray}
+
+$\bm{L}$ ist im allgemeinen Fall, d.h. bei zusammengesetzten Hypothesen eine Matrix, aber in der Regel nur ein Vektor.
+
+\subsubsection{Allgemeine Modelltests}
+
+Ein weiterer Aspekt der Modellbewertung ist die Frage, ob die Daten durch den linearen Prädiktor bzw. die Klassifikationsmerkmale insgesamt hinreichend gut beschrieben werden, wenn Link- und Varianzfunktion als gegeben angenommen werden. 
+
+Hierbei können vier Fragestellungen unterschieden werden. Neben der Bewertung des Modells insgesamt interessiert, ob sich die Modellanpassung signifikant verändert, wenn ein Merkmal in das Modell aufgenommen bzw. aus dem Modell entfernt wird. Weiterhin stellt sich die Frage, ob bzw. welche Ausprägungen bei diskreten Merkmalen zusammengefasst werden können.
+
+Formal entsprechen diese Fragestellungen dem Vergleich zweier geschachtelter Modelle, d.h. dem Vergleich eines komplexen Modells $\mu_\alpha$  mit $a$  Parametern mit seiner Modellvereinfachung $\mu_\beta$  mit $b<a$  Parametern.
+
+Die Modellvereinfachung kann z.B. durch Weglassen von Merkmalen oder dem Zusammenfassen einzelner Merkmalsausprägungen erfolgen. Für eine gegebene Verteilungs- und Linkfunktion wird das komplexere Modell  $\mu_\alpha$ die Daten besser anpassen als die Modellvereinfachung $\mu_\beta$ . Die größere Komplexität von $\mu_\alpha$  drückt sich durch insgesamt $a-b$  zusätzlich zu schätzenden Parameter bzw. weniger Freiheitsgrade aus.
+
+Ob die Verbesserung der Anpassung relativ zu der Erhöhung der Komplexität signifikant ist, kann mit dem Likelihood-Ratio-Test oder dem verallgemeinerten F-Test überprüft werden, der auf der Differenz der skalierten Devianzen (\ref{eq:6a}) bzw. allgemeiner der logarithmierten Likelihood-Werte beider Modelle aufbaut.
+
+Aus (\ref{eq:5}) leitet sich die Verallgemeinerung des Likelihood-Ratio-Tests zum Vergleich dieser beiden geschachtelten Modelle $\mu_\alpha$  und $\mu_\beta$  mit $a$  bzw. $b$   zu schätzenden Parametern ab:
+
+\begin{eqnarray} 
+S = \frac{D(y;\hat{\mu}_b) - D(y;\hat{\mu}_a)}{\phi} \sim X^2_{a-b}
+\end{eqnarray}
+ 
+Diese Teststatistik folgt asymptotisch einer $\chi^2$- Verteilung mit $a-b$  Freiheitsgraden. Ist der Dispersionsparameter $\phi$  nicht vorgegeben bzw. a-priori bekannt und somit z.B. durch (\ref{eq:7a})  zu schätzen, folgt die Teststatistik asymptotisch einer $F$-Verteilung
+
+\begin{eqnarray}  \label{eq:12}
+S =  \frac  {\frac{D(y;\hat{\mu}_b) - D(y;\hat{\mu}_a)}{a-b}}     {\frac{D(y;\hat{\mu}_a)}{T-a}}       \sim F_{a-b,T-a}
+\end{eqnarray}
+
+
+und wird als „Verallgemeinerter $F$-Test“ bezeichnet. Beide Teststatistiken eignen sich sowohl zur Bewertung des linearen Prädiktors, z.B. bei einer schrittweisen Variablenselektion, als auch zum Test von Parametern in der Link- und Varianzfunktion.
+
+Falls die Hypothese, dass das komplexere Modell die Daten nicht besser als die Modellvereinfachung anpasst, nicht verworfen werden kann, beschreibt die Modellvereinfachung die Daten ausreichend. Die zusätzlichen Merkmale bzw. Ausprägungen können aus dem Modell entfernt werden, ohne dass sich die Modellanpassung signifikant verschlechtert. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Merkmalsauswahl und Modellanpassung}
+
+Neben übergeordneten Fragen nach genereller Modellanpassung bzw. Prognosequalität des Modells ist einer der wichtigsten zu beachtenden Punkte die Auswahl der in das Modell aufzunehmenden Merkmale. Das Modell sollte diejenigen Merkmale beinhalten, welche die Schadenerwartung systematisch beeinflussen, jedoch diejenigen ausschließen, die keinen systematischen Effekt haben. 
+
+Hierbei sind neben der formalen statistischen Analyse eine intensive Auseinandersetzung mit inhaltlichen Aspekten der Modelle bzw. einzelner Merkmale unabdingbar. Der Aktuar sollte sich ein fundiertes Wissen über die betrachtete Sparte erarbeiten und den Dialog mit den Fachbereichen suchen. Neben der Kenntnis der "Mechanik", die hinter der Risikosituation in den einzelnen Sparten steht, ist immer auch der gesunde Menschen-verstand bei der Bewertung der Einflussgrößen im Risikomodell gefragt.
+
+\subsubsection{Iterative Modellauswahl}
+
+Die bekannteren Statistikpakete sprechen mit der sog. Typ-I- oder Typ-III-Analyse zwei mögliche Strategien für die Merkmalsauswahl an:
+
+Bei der Typ-I-Analyse werden – beginnend mit dem Mittelwert über alle Beobachtungen als 0-Modell – die Merkmale in einer vorgegebenen Folge sukzessive in das Modell aufgenommen. In jedem Schritt wird dokumentiert, wie die hinzugenommene Variable die Modellanpassung verbessert.
+
+Die Typ-I-Analyse ahmt quasi die sogenannte schrittweise Vorwärtsauswahl nach. Ihr Erkenntniswert ist eher als gering einzustufen.
+
+Bei der Typ-III-Analyse bildet das maximale Modell mit allen Merkmalen den Ausgangspunkt. Anschließend wird abwechselnd jedes Merkmal aus dem maximalen Modell entfernt und geprüft, wie sich die Modellanpassung durch Herausnahme dieses Merkmals verschlechtert. Dieses Verfahren ist unabhängig von der Reihenfolge der Merkmale. Die Ergebnisse beschreiben die Signifikanz eines jeden Merkmals relativ zum maximalen Modell.
+
+Eine sog. schrittweise Rückwärtsauswahl kann durch das iterative Wiederholen der Typ-III-Analyse, wobei in jedem Schritt das am wenigsten signifikante Merkmal aus dem Modell entfernt wird, durchgeführt werden.
+
+Die Ergebnisse dieser Verfahren hängen sehr stark von dem Zeitpunkt der Schätzung des Dispersionsparameters ab (siehe Formel (\ref{eq:7a}) und (\ref{eq:7b})). Eine bessere Modellanpassung durch zusätzliche Merkmale führt immer zu einem kleineren Schätzwert für den Dispersionsparameter. Weiterhin beeinflusst auch die Datenaggregation auf Merkmalsebene seine Schätzung. Wird der Bestand nur auf den maximal möglichen Merkmalswürfel aggregiert, fällt für ein gegebenes Modell die Schätzung anders aus, als wenn auf das Niveau der gerade betrachteten Merkmale aggregiert wird. Aus diesem Grund sollte der Dispersionsparameter für diese Fragestellungen möglichst auf einem plausiblen Wert – z.B. dem aus dem maximalen betrachteten Modell – fixiert werden.
+
+\subsubsection{Problemfelder bei der Interpretation der Ergebnisse}
+
+Nicht-Signifikanz als Testergebnis bedeutet allgemein nicht, dass es keine Unterschiede gibt, sondern nur, dass diese Hypothese nicht mit aus-reichender Sicherheit abgelehnt werden kann. So kann z.B. die betrachtete Datenmenge zu gering sein, um stabile Ergebnisse zu erhalten und damit eine entsprechende Signifikanzaussage treffen zu können. 
+
+Weiterhin sind bei der Typ-III-Analyse als nicht signifikant eingestufte Merkmale nicht zwangsläufig für das Modell per se unwichtig. Sie können auch hoch korreliert mit anderen (modellrelevanten) Merkmalen sein, so dass sie – isoliert betrachtet – signifikant, aber in Kombination mit den korrelierten Merkmalen insignifikant erscheinen. Im Umkehrschluss erscheinen die anderen korrelierten Merkmale hierbei auch als wenig signifikant.
+
+Auf der anderen Seite erübrigt ein signifikantes Testergebnis nicht eine gute inhaltliche Kenntnis des Datenmaterials, so dass stets mit Vorsicht Schlussfolgerungen zu ziehen sind. Wird z.B. ab einer bestimmten KH-Tarifgeneration das Merkmal Garage qualitativ erfasst, das im Altbestand entsprechend mit \textit{unbekannt} verschlüsselt ist, kann die Signifikanz dieses Merkmals unter Umständen primär auf dem Unterschied aller weiteren Merkmalsausprägungen zur Ausprägung \textit{unbekannt} beruhen, was lediglich einen Unterschied zwischen Alt- und Neubestand impliziert. Sinnvoller wäre es in diesem Fall, z.B. die Tarifgenerationen isoliert zu analysieren oder den Tarifgenerationen-Effekt über ein eigenes Merkmal abzubilden.
+
+\subsubsection{Prognosequalität}
+ 
+Neben der rein formalen Modell-Prüfung sollte auch eine Gesamtbewertung des Modells an Daten erfolgen, die nicht in die Schätzung eingegangen sind. So kann einerseits die Prognosequalität eines Modells besser abgeschätzt und andererseits das Over-Fitting von Modellen vermieden werden. Hier bietet es sich an, Teile des Datenbestandes stichprobenartig auszuwählen, um sie nicht zur Modellschätzung sondern als Evaluierungsstichprobe zu verwenden. Die Evaluierung erfolgt dann über eine Bewertung der Abweichung von beobachteten zu vorhergesagten Werten mittels z.B. der Fehlerquadratsumme, Devianz oder $\chi^2$-Statistik.
+
+Diese stichprobenartige Bestandsaufteilung kann auch iterativ wiederholt werden, um einerseits mehr Informationen über die Prognosequalität aber andererseits auch die Modell- bzw. Parameterstabilität über die Variation dieser Größen abschätzen zu können. Weiterhin kann auch eine segmentweise Bewertung, z.B. in Abhängigkeit der Höhe der (geschätzten) Zielgröße oder über merkmalsspezifische Segmente, zusätzliche Aufschlüsse über lokale Anpassungsprobleme liefern.
+
+Diese Aufteilung des Analysebestandes in Schätz- und Evaluierungsstichprobe hat den Nachteil, dass die Modellschätzung auf Grund des kleineren Schätzbestandes ungenauer wird. Aus diesem Grund sollte das letztendliche Modell immer noch einmal auf Basis des Gesamtbestandes geschätzt werden. Weiterhin können z.B. auch per se nicht in der Analyse berücksichtigte Bestände – wie z.B. ältere Statistikjahre – als Evaluierungsbestand herangezogen werden. 
+
+\subsubsection{Weitere Überlegungen}
+
+Bei der Modellbildung spielen nicht nur statistische Tests eine wichtige Rolle, sondern auch gegebene rechtliche bzw. inhaltliche Rahmenbedingungen, Intuition und Erfahrungen aus früheren Untersuchungen. 
+
+In den meisten Tarifierungsmodellen sind viele Merkmale – auch in ihrer Struktur – bereits a-priori gesetzt. So werden aus den bekannten Gründen in der KH-Sparte z.B. die Merkmale \textit{Anzahl schadenfreier Jahre} oder  \textit{Regionalklasse} sowohl in der Strukturierung der Merkmalsausprägungen als auch in den Indexwerten fest vorgegeben. Eine Merkmalsauswahl müsste auf diesem Grundgerüst aufbauen, was die Komplexität, aber auch die Freiheitsgrade in der Modellbildung einschränkt.
+
+Es stellt sich auch oft die Frage, ob stetige Merkmale wie z.B. Altersangaben - evtl. sinnvoll gruppiert als kategoriale Merkmale - berücksichtigt werden sollten. Im Umkehrschluss könnten auch per se kategoriale Merkmale, wie die Regionalklassen, als stetige Merkmale behandelt werden. Dies ist z.B. sinnvoll, wenn Indexabstände zwischen aufeinander-folgenden Merkmalsausprägungen nicht zu stark variieren sollen.
+
+Generell sollte über einen Vergleich historischer Ergebnisse auf Trends in den Modellen geachtet werden. Trends müssen sich nicht nur auf Index-werte beziehen, sondern können sich auch in Verschlüsselungsgraden bzw. Besetzungszahlen der Merkmale ausdrücken.
+
+Nicht alle als technisch oder inhaltlich signifikant identifizierte Merkmale können auch direkt im Tarifbuch umgesetzt werden. Neben rechtlichen Restriktionen (z.B. AGG) sind auch inhaltliche Randbedingungen zu beachten. Sollte sich z.B. ein Merkmal wie  \textit{Lastschrift-/Rechnungszahler}, das bislang als nicht tarifrelevant erhoben wurde, als trennstarkes Merkmal herauskristallisieren, kann es  nicht ohne weiteres in Tarifbüchern eingesetzt werden. Kunden mit „ungünstigen“ Zahlungsarten könnten relativ problemlos in „günstigere“ Zahlungsarten wechseln und damit das zugrundeliegende Tarifmodell aushebeln. Insgesamt wird eine rein technische Merkmalsauswahl in der Fachliteratur sehr kritisch gesehen. Selten wird für eine Kombination der vorgestellten Vor- und Rückwärtsauswahl plädiert, wobei z.B. nach jeder Aufnahme eines neuen Merkmals in einem Vorwärtsschritt über einen Rückwärtsschritt geprüft wird, ob in dem erweiterten Modell andere Merkmale evtl. an Signifikanz verlieren. 
+
+Nur mit Vorsicht sollte aus einem bestehenden Tarif lediglich aufgrund von Signifikanztests Tarifmerkmale herausgenommen werden. Dies trifft vor allem auf solche Tarifmerkmale zu, die nur auf einem kleinen Teil des aktuellen Portfolios differenzierend sind, da diese aufgrund der Volumengewichtung häufig nur eine geringe statistische Signifikanz aufweisen. Als Beispiel kann hier die Bauartgruppe in der Wohngebäudeversicherung dienen, die bei der überwiegenden Mehrzahl der versicherten Objekte die Ausprägung „BAK 1“ (Steinbau, feste Dachung etc.) hat. Bei Herausnahme des Merkmals wäre im Neugeschäft eine Zunahme von hoch feuergefährdeten Risiken zu erwarten. 
+
+Daher wird empfohlen, sich bei der Modellbildung auch auf inhaltliche Plausibilitätsüberlegungen und nicht nur auf rein technische Verfahren zu stützen. 
+
+Im klassischen Setup der Tarifkalkulation für Massensparten leidet die inferenzgetriebene Modellbewertung unter der großen Anzahl von Freiheitsgraden im Modell ($\sim$ Anzahl der Tarifzellen), die einen Verbrauch von wenigen Freiheitsgraden für neue Merkmale relativ schwach bestrafen.
+
+
+
+
+
+\subsection{Modelldiagnose}
+
+Bei der Modellwahl muss man stets einen Kompromiss zwischen der Genauigkeit und der Komplexität eines möglichen Modells finden. Hinweise über die Angemessenheit von Modellen geben neben den klassischen Signifikanztests Residuenplots und andere grafische Methoden.
+
+\subsection{Residuenanalyse}\index{Residuenanalyse}
+
+Die Residuenanalyse eignet sich hervorragend zur (grafischen) Modellüberprüfung. Es werden hier in der Regel spezielle theoretische Verteilungseigenschaften der Residuen empirisch überprüft. Im einfachsten Fall beschreiben Residuen die Differenz zwischen den beobachteten und unter dem Modell geschätzten (Schadenbedarfs-)Werten. 
+
+Somit ergeben sich die \textit{Roh-Residuen}: 
+
+\begin{eqnarray} 
+r_t=y_t - \hat{\mu}_t
+\end{eqnarray}
+
+Man kann verschiedene Residuenmaße ableiten, um für jede Beobachtung anzugeben, wie stark der Schätzwert von der tatsächlichen Beobachtung abweicht.
+
+Ein Residuenmaß ist das Devianzresiduum:
+
+\begin{eqnarray} 
+r_t^D = \textnormal{sgn} (y_t - \hat{\mu}_t) \sqrt{d_t} \qquad ,
+\end{eqnarray}
+
+wobei $d_t$  die Beiträge der einzelnen Beobachtungen zur Devianz (vgl. Kap. \ref{section:Devianz}) bezeichnet.
+
+Im Gegensatz zu den Roh-Residuen ist die asymptotische Normalverteilungsannahme bei den Devianzresiduen weniger kritisch zu beurteilen, da bei den Roh-Residuen die Verteilungsannahme des GLM einfließt. Devianzresiduen eignen sich insbesondere für die Beurteilung der Modellanpassung bzw. der Identifikation von Ausreißern oder einflussreichen Datenpunkten.
+
+Ein anderes häufig verwendetes Maß für das Residuum ist das Pearson-Residuum: 
+
+\begin{eqnarray} 
+r_t^{PS} =  \frac {y_t - \hat{\mu}_t}   {\sqrt{\frac{V(\hat{\mu}_t)}{w_t}}}  \qquad ,
+\end{eqnarray}
+
+
+wobei $V(\hat{\mu}_t)$  der an der Stelle $\hat{\mu}_t$  evaluierte Wert der Varianzfunktion und $w_t$   eine Gewichtung (z.B. Anzahl der Risiken) ist. 
+Sie lassen sich im Vergleich zu den Devianzresiduen eher als ein Maß der Residuenvariation interpretieren und eignen sich für die Beurteilung der Varianzfunktion des Modells.
+
+\subsubsection{Grafische Überprüfung}
+
+Bei stetigen Verteilungen ist es mittels eines Histogramms möglich zu überprüfen, ob die Devianzresiduen normalverteilt sind. Größere Abweichungen von der Normalverteilung sind ein guter Anhaltspunkt für die Verletzung der Verteilungsannahmen. Das Diagramm \ref{fig:residuenanalyse1} zeigt eine Beispielverteilung von Devianzresiduen. In diesem Fall scheinen die Residuen weitgehend entsprechend der Normalverteilung verteilt zu sein.
+
+\begin{figure}  %alt:Abb_11
+	\centering
+  \includegraphics[width=0.7\textwidth]{grafik/residuenanalyse1.png}
+      \caption{Residuenanalyse: Verteilung der Devianzresiduen}
+	\label{fig:residuenanalyse1}
+	
+\end{figure} 	 
+
+Streudiagramme von Residuen in Abhängigkeit des Schätzwertes können Aufschluss über die Angemessenheit der Verteilung geben. Das abgebildete Streudiagramm (Abb. \ref{fig:residuenanalyse2}) zeigt das Ergebnis der Anpassung eines verallgemeinerten Modells. Man erkennt, dass der Mittelwert und die Schwankungen der Devianzresiduen einigermaßen konstant sind, wenn man sich von links nach rechts bewegt. Das lässt vermuten, dass die angenommene Verteilung angemessen ist.
+
+\begin{figure}  %alt:Abb_12
+	\centering
+  \includegraphics[width=0.7\textwidth]{grafik/residuenanalyse2.png}
+      \caption{Residuenanalyse: Streudiagramm der Devianzresiduen}
+	\label{fig:residuenanalyse2}
+	
+\end{figure} 	 
+
+
+Steigt hingegen die Variabilität der Devianzresiduen mit dem Schätzwert an, deutet dies darauf hin, dass eine unangemessene Verteilung im Modell gewählt wurde und die Beobachtungen mit den Schätzwerten stärker schwanken als erwartet. Dies könnte z.B. passieren, wenn ein Modell mit Normalverteilung an Poisson-verteilte Daten angepasst wird. Die Abbildung \ref{fig:residuenanalyse3} zeigt dieses Ergebnis im Streudiagramm der Devianzresiduen.
+ 
+\begin{figure}  %alt:Abb_13
+	\centering
+  \includegraphics[width=0.7\textwidth]{grafik/residuenanalyse3.png}
+      \caption{Residuenanalyse: Streudiagramm der Devianzresiduen}
+	\label{fig:residuenanalyse3}
+	
+\end{figure} 	
+
+
+
+\subsection{Berücksichtigung von a-priori-Informationen und Umgang mit verwandten Fragestellungen} \index{a-priori-Information} \label{subsection:a_priori_info}
+
+\subsubsection{Problemstellung}
+
+In der praktischen Anwendung – z.B. für die Tarifkalkulation – müssen häufig externe Vorgaben für einzelne Merkmale bzw. Modellvariablen berücksichtigt werden. Ein typisches Beispiel ist das Merkmal \textit{Schadenfreiheitsrabatt} in der Kraftfahrt-Haftpflicht-Versicherung. Die Indexwerte (\textit{Modell-Parameter}) für dieses Merkmal sind in den Versicherungsbedingungen fest verankert.
+
+Diese vorgegebenen Parameter müssen bei der Ermittlung der anderen Parameter a-priori berücksichtigt werden. Prinzipielle Idee dieser Modellschätzung mit Restriktionen ist es, a-priori-Informationen in geeigneter Weise aus dem Beobachtungsvektor $y$  heraus zu rechnen und die Modellschätzung dann für die verbleibenden Parameter mit dem modifizierten Beobachtungsvektor  $y^*$ vorzunehmen. Auf diesem Ansatz basiert z.B. auch der verallgemeinerte  $F$-Test auf eine Untermenge der Modell-Parameter. Technisch werden die a-priori-Informationen auch \textit{Offset} genannt.
+
+Auf folgende Ausgangs-Situationen lässt sich die Vorgehensweise übertragen:
+\begin{itemize}
+\item Es gibt Merkmale mit „gutem“ Füllgrad (z. B. 100\%, also ohne unbekannt-Ausprägungen) und andere Merkmale mit „schlechtem“ Füllgrad (z. B. < 50\%). Dann kann zunächst eine GLM-Anpassung mit ausschließlich den gut gefüllten Merkmalen erfolgen und danach können diese Ergebnisse bei der GLM-Anpassung der übrigen Merkmale wie eine a-priori-Information verwendet werden.
+\item Es sollen nur die effektiven Zusatzeffekte neuer Merkmale zu einem bestehenden (Tarif-)Modell isoliert bzw. quantifiziert werden. Die Schätzer aus dem bestehenden Modell werden als a-priori-Informationen zur Schätzung des Modells mit den neuen Merkmalen vorgegeben. So kann vermieden werden, dass die Schätzergebnisse für die neuen Merkmale durch die Korrelation\index{Korrelation} zum bestehenden Modell beeinflusst werden.
+\end{itemize}
+
+Zur ad-hoc-Bewertung von neuen Merkmalen können statt der angesprochenen Schätzer auch Tarif"=Prämien, Schadenquoten etc. aus dem bestehenden Modell als a-priori-Informationen vorgegeben werden. Daher stammt auch der in der Praxis geläufige Begriff \textit{Schadenquotenverfahren}. Diese Aufteilung des Modells ist gewissermaßen die vorsichtigere Variante gegenüber der Alternative, alle Merkmale in einem einzigen Analyseschritt mit möglichen gegenseitigen Wechselwirkungen zu untersuchen. Die Analogie im möglichen Vorgehen zum oben geschilderten „Füllgrad“"=Problem ist offensichtlich.
+
+\subsubsection{A-priori-Informationen im klassischen linearen Modell}
+
+Anschaulich lässt sich der Ansatz zur Berücksichtigung von a-priori-Informationen in der Modellschätzung am Beispiel des klassischen linearen Modells der Form
+
+\begin{eqnarray} 
+y_t=\bm{x'}_t \bm{\beta} + e_t                   \quad  \textnormal{mit}  \qquad    e_t \sim N(0,\sigma_t^2) \quad t=(1,\ldots,T)
+\end{eqnarray}
+
+darstellen. Das Modell wird in der Form
+
+\begin{eqnarray} \label{eq:13}
+y_t=\bm{x'}_{1t} \bm{\beta}_1  +   \bm{x'}_{2t} \bm{\beta}_2   + e_t     \quad  \textnormal{mit}    \bm{\beta}_{1[Mx1]} \quad  \textnormal{und}    \bm{\beta}_{2[Nx1]}
+\end{eqnarray}
+
+aufgeteilt, so dass die a-priori-Informationen in dem Vektor $\bm{\beta}_2$ und alle verbleibenden und noch zu schätzenden Parameter in dem Vektor  $\bm{\beta}_1$ zusammengefasst werden. Nun werden die a-priori-Informationen auf beiden Seiten der Modellgleichung subtrahiert.
+
+\begin{eqnarray} \label{eq:14}
+y^*_t=\bm{x'}_{1t} \bm{\beta}_1     + e^*_t     \quad  \textnormal{mit}     y^*_t = [y_t - \bm{x}_{2t} \bm{\beta}_2
+\end{eqnarray}
+
+Der Parametervektor $\bm{\beta}_1$  des modifizierten Modells kann z.B. mit dem Kleinste-Quadrate-Schätzer geschätzt werden. 
+ 
+Auf der Logik aus (\ref{eq:13}) und (\ref{eq:14}) basiert auch der allgemeine F-Test (\ref{eq:12}) zum Test auf eine Untermenge der Parameter. Im Vektor   sind Parameter zusammengefasst, über die Hypothesen aufgestellt werden.
+
+
+\subsubsection{A-priori-Informationen im Verallgemeinerten Linearen Modell}
+
+Die Verallgemeinerung dieses Ansatzes zur Berücksichtigung von a"=priori"=Informationen in der Modellschätzung für GLM ist etwas aufwändiger. Das GLM in der Form aus (\ref{eq:3}) und (\ref{eq:2}) wird wiederum so aufgeteilt, dass die a-priori-Informationen in dem Vektor $\bm{\beta}_2$ und alle verbleibenden und noch zu schätzenden Parameter in dem Vektor $\bm{\beta}_1$  zusammengefasst werden:
+
+\begin{eqnarray} \label{eq:15}
+y_t=g^{-1}(\bm{x'}_{1t} \bm{\beta}_1  +   \bm{x'}_{2t} \bm{\beta}_2)   + e_t     \quad  \textnormal{mit}  \quad   Var(y_t) = \frac{\phi}{w_t}V(\mu_t)
+\end{eqnarray}
+
+Bei der Bildung des modifizierten Modells müssen die a-priori-Informationen über die Linkfunktion auf das Skalenniveau von $y_t$  transformiert werden:
+
+\begin{eqnarray} \label{eq:16}
+y^*_t=g^{-1}(\bm{x'}_{1t} \bm{\beta}_1  +   \bm{x'}_{2t} \bm{\beta}_2)   + e^*_t     \quad  \textnormal{mit}  \quad  \nonumber \\           G^{-1}[g(y_t) - \bm{x'}_{2t} \bm{\beta}_2] \quad  \textnormal{und}  \quad    Var(y_t) = \frac{\phi}{w_t}V(\mu_t)
+\end{eqnarray}
+
+Zu beachten ist, dass die Varianzfunktion sich weiterhin auf die untransformierte Responsevariable $y_t$  bezieht. In der Darstellungsform aus (\ref{eq:16}) ist aber eine direkte Schätzung des modifizierten Modells mit den bekannten Software-Routinen für Verallgemeinerte Lineare Modelle nicht möglich. Hierfür müsste die Varianz in Bezug auf die transformierte Responsevariable $y^*_t$  dargestellt werden. 
+
+Für die in der Praxis wichtigen multiplikativen Modelle (logarithmische Linkfunktion) aus der Familie der Power-Varianz-Funktionen lässt sich das Modell aus (\ref{eq:15}) bzw. (\ref{eq:16}) so umformen, dass sich die Varianzfunktion direkt in Abhängigkeit von dem Erwartungswert von $y^*_t$  ausdrücken lässt und somit direkt geschätzt werden kann. 
+
+\begin{eqnarray} 
+y^*_t=\exp (\bm{x'}_{1t} \bm{\beta}_1  +   \bm{x'}_{2t} \bm{\beta}_2)   + e^*_t     \quad  \textnormal{mit}  \quad  \nonumber \\  
+           Var(y^*_t) =   \frac{\phi}{w_t}   \frac{1}{[\exp(\bm{x'}_{2t} \bm{\beta}_2)]^{2-\psi}}     {(\mu^*_t)}^\psi
+\end{eqnarray}
+
+
+In dieser Form kann das Modell mit den bekannten Software-Routinen für die Schätzung von Generalisierten Linearen Modellen ohne Modifikationen am Algorithmus berechnet werden. Lediglich die Beobachtungsgewichte  $w^*_t$  müssen um den Faktor  $[\exp(\bm{x'}_{2t} \bm{\beta}_2)]^{2-\psi}$ erweitert werden. In der Tabelle \ref{tab:Power_Varianz_Funktionen} sind für die wichtigsten Mitglieder der Power-Varianz-Funktionen die expliziten Anpassungsfaktoren $\xi(p)$  zusammengefasst.
+
+
+\begin{table}
+ \caption{Power-Varianz-Funktionen: Anpassungsfaktoren}
+ %\footnotesize \sriptsize \tiny
+
+\begin{center}
+\begin{tabular}{c|c|c}
+    
+Verteilung   & $V(\mu, \psi)$  & $\xi(p)$ \\ \hline
+
+Normal               &  $\psi=0$   &   $[\exp(\bm{x'}_{2t} \bm{\beta}_2)]^2$ \\
+Poisson              &  $\psi=1$   &   $\exp(\bm{x'}_{2t} \bm{\beta}_2)$ \\
+Gamma             &  $\psi=2$   &   $1$ \\
+Invers-Normal     &  $\psi=3$   &   $\frac{1}{\exp(\bm{x'}_{2t} \bm{\beta}_2)}$ \\
+
+\end{tabular}
+\end{center}
+
+\label{tab:Power_Varianz_Funktionen}
+ \end{table}
+
+\subsubsection{Beseitigung von Strukturbrüchen (Exkurs)}
+
+Kategoriale Variablen, wie z.B. Regionalklassen oder Altersklassen, weisen oft eine innere Ordnung (\textit{Ordinalität}, \textit{Organik}\index{Organik}) auf, die auch in der Modellierung erhalten bleiben soll. So wäre es unerwünscht, für eine höhere Typklasse einen geringeren Risikobeitrag auszuweisen. Auch Mindestabstände zwischen aufeinanderfolgenden Modellparametern können in diesen Kontext eingeordnet werden.
+
+Die hier vorgestellten Modellierungsansätze im Rahmen der GLM können die Ordinalität von kategorialen Variablen nicht per se erkennen bzw. automatisch in den Schätzern berücksichtigen. Wenn solche sogenannten Strukturbrüche\index{Strukturbrüche} nicht durch Zusammenfassung entsprechender benachbarter Merkmalsausprägungen beseitigt werden, bietet es sich an, in einem ersten Schritt die Schätzer entsprechend manuell nachzubearbeiten, bis die Monotonität\index{Monotonie} bzw. die gewünschten Indexabstände hergestellt sind. Die aktuarielle Sorgfaltspflicht gebietet es, z.B. sicherzustellen, dass durch die Nachbearbeitung die mit der jeweiligen Randverteilung gewichtete Summe der Modellparameter jedes Merkmals konstant bleibt.
+
+Um mögliche Auswirkungen dieser Nachbearbeitung auf das Gesamtmodell bzw. die anderen Merkmale adäquat zu berücksichtigen, können in einem zweiten Modellierungsschritt die manuell nachbearbeiteten Parameter nach der in diesem Abschnitt skizzierten Vorgehensweise als a-priori-Informationen in das Modell aufgenommen werden, damit alle freien Parameter entsprechend dieser Restriktionen optimiert werden. Dieser Zyklus ist bei Bedarf mehrfach zu wiederholen, bis alle Strukturbrüche beseitigt sind.
+
+Als eine in der Praxis verwendete Alternative können solche kategorialen Merkmale durch eine entsprechende Umkodierung auch als stetige Merkmale verwertet werden. Diese Merkmale können dann als erklärende Variable in Form eines Polynoms beliebigen Grades in das Modell aufgenommen werden. Durch den Grad des Polynoms kann mit relativ wenigen Freiheitsgraden der funktionale Zusammenhang – ähnlich der Modellierung von Splines\index{Splines} – sehr flexibel definiert werden. Zudem wird die Forderung nach vergleichbaren Abständen zwischen aufeinanderfolgenden Modellparametern in der Regel weitgehend automatisch sichergestellt. Vgl. hierzu auch Abb. \ref{fig:vertragsdauer_kategorial}
+
+
+
+\begin{figure}  %alt:Abb_10
+	\centering
+  \includegraphics[width=0.7\textwidth]{grafik/vertragsdauer_kategorial.png}
+      \caption{Vertragsdauer als kategoriales Merkmal vs. Glättung durch Polynom}
+	\label{fig:vertragsdauer_kategorial}
+	
+\end{figure} 	 
+
+
+\subsection{Systematische Nullschadenbedarfe und Tweedie-Verteilung}\label{Tweedie}
+
+Typischerweise nimmt die Zufallsvariable \textit{Schadenbedarf eines Versicherungsvertrages} in einem Jahr mit positiver Wahrscheinlichkeit den Wert 0 an (und lässt sich, unter der Bedingung, größer als 0 zu sein, stetig modellieren). Wird das kreuzklassifizierte Kalkulations"=Kollektiv hinreichend fein dargestellt, also etwa so, dass in keiner Datenzeile das Volumen größer als eine Jahreseinheit ist, erkennt man diesen Effekt im Allgemeinen daran, dass in sehr vielen Zeilen der beobachtete Schadenbedarf 0 ist. Viele Verteilungen aus der exponentiellen Familie haben diese Eigenschaft nicht, sondern lassen den Wert 0 nur mit Wahrscheinlichkeit 0 zu. Die sogenannte Tweedie-Verteilung, charakterisiert durch die \textit{Power}-Varianzfunktion $V(\mu)=\mu^\psi$  , hat im Fall $1<\psi<2$  an der Stelle 0 eine positive Wahrscheinlichkeitsmasse, was ein Argument dafür ist, dass sie sich in der Praxis häufig als geeignet erweist bei der Modellierung von Schadenbedarfen in einem GLM.
+
+
+
+
+
+
+%%\section{Credibility-Verfahren} \index{Credibility} \label{Credibility_Verfahren}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% 22.08.2014 entfallen -> vgl. hierzu Datei        kap3_mit_unterkapitel_credibility.tex   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+\section{Geografische Glättungsverfahren} \label{Geografische_Glaettungsverfahren}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Oft werden in der Tarifkalkulation regionale Effekte – wie z.B. die Regionalklassen in der Kraftfahrt-Sparte – einbezogen. Werden die (Schaden-) Informationen aus geographisch benachbarten Gebieten lediglich unabhängig voneinander berücksichtigt, führt dies oft zu wenig ausgeglichenen, inhomogenen Regionalstrukturen. Dies kann für gewisse Konstellationen sachgerecht sein (Stadt-Land-Gefälle). 
+
+In anderen Konstellationen erscheinen scharfe Grenzen unplausibel. Zur Modellierung in Konstellationen, in denen derartige scharfe Grenzen nicht sachgerecht erscheinen, bilden die Generalisierten Additiven geeignete Modelle. Hier wird die geographische Komponente über einen geo-additiven Prädiktor modelliert, eine natürliche Erweiterung der Verallgemeinerten Linearen Modelle. Für weiterführende Details sei z.B. auf \cite{Fahrmeir} verwiesen.
+
+Ein möglicher Ansatz zur geographischen Glättung wird im GDV-Statistikhandbuch der Sachversicherung 2009 \cite{Statistikhandbuch} beschrieben. Ziel ist es, die beobachtete Schadenerfahrung einer Region über eine Gewichtungsfunktion durch eine gewichtete Summe der Schadenerfahrungen der umliegenden Regionen zu ersetzen. 
+
+Dabei werden die Schadeninformationen aus angrenzenden Gebieten hoch, diejenigen weiter entfernt liegender Gebiete dagegen gering gewichtet. Stark besetzte Gebiete (Beobachtungsgewicht) werden stärker als schwach besetzte Gebiete berücksichtigt.
+
+Der geodätische Abstand der Mittelpunkte z.B. zweier Postleitzahlgebiete i und k mit der geographischen Länge $\lambda$   bzw. Breite $\phi$  wird über folgende Formel berechnet: 
+
+\begin{eqnarray} 
+d_{ik} =  \textnormal{113,3 km} \cdot \frac{180}{\pi} \cdot \arccos(\sin \phi_i \cdot \sin \phi_k + \cos \phi_i \cdot \cos \phi_k \cdot \cos(\lambda_i-\lambda_k))
+\end{eqnarray}
+
+ Als ausgeglichene Schadeninformation $\bar{I}_i$  der Region i wird definiert: 
+
+\begin{eqnarray} 
+\bar{I}_i = \sum_{k=1}^K  \alpha_{ik} \cdot I_k    \quad  \textnormal{mit}  \quad    \alpha_{ik} = \frac{w_k \cdot \exp \left( - \frac{d_{ik}}{a} \right)}   {\sum_{j=1}^K w_j \cdot  \exp \left( - \frac{d_{ij}}{a}\right)}      \quad  \textnormal{und}  \quad   \sum \alpha_{ik}=1,
+\end{eqnarray}
+
+wobei $a$  den Formparameter, der bestimmt, in welchen Umfang die Informationen der Nachbargebiete berücksichtigt werden, und $w_k$   das Gewicht der Region $k$ bezeichnen.
+ 
+\begin{figure}  %alt:Abb_15
+	\centering
+  \includegraphics[width=1\textwidth]{grafik/plz_rohdaten.png}
+      \caption{Beispiel auf Postleitzahlebene: Rohdaten (links) mit a=20 ausgeglichen (rechts)}
+	\label{fig:plz_rohdaten}
+	
+\end{figure} 
+
+Die ausgeglichenen Schadeninformationen können direkt in der weiteren statistischen Analyse eingesetzt werden. In der Regel werden sie aber zur Bildung von Regionalklassensystemen herangezogen. Die weitere Analyse unter Berücksichtigung der ermittelten Regionalgliederung erfolgt dann wieder auf Basis der unausgeglichenen Rohdaten.
+ 
+
+\section{Clusterverfahren}\index{Clusterverfahren} \label{Clusterverfahren}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Grundlegende Idee von Clusterverfahren ist es, eine Grundgesamtheit von $n$ Elementen bzw. Objekten, die jeweils durch eine Anzahl von Merkmalen beschrieben werden, in Gruppen (Cluster) einzuteilen. Die Anzahl der Gruppen ist dabei im Allgemeinen nicht bekannt bzw. im Laufe der Analyse zu bestimmen.
+
+Elemente, die derselben Gruppe zugeordnet werden, sollen sich in Bezug auf ihre Merkmale möglichst ähnlich sein, während Elemente verschiedener Gruppen sich möglichst deutlich unterscheiden sollen. Die Gruppen sollen also in sich homogen und untereinander heterogen sein. Typische Anwendungsbeispiele kommen aus dem Bereich der Marktforschung, z.B. bei Fragen der Kunden- bzw. Marktsegmentierung.
+
+Im Rahmen der Tarifkalkulation wird hierunter in der Regel die Zusammenfassung bzw. Klasseneinteilung von Ausprägungen eines Tarifmerkmals verstanden. Beispiele sind die Zusammenfassung von Zulassungsbezirken zu Regionalklassen bzw. von Fahrzeugtypen zu Typklassen über ihre individuellen Schadenbedarfsindizes. Bei dieser Form der Clusteranalyse mit nur einem stetigen Merkmal handelt es sich de facto um eine einfache Form der Varianzanalyse, die auf dem sogenannten Ward-Verfahren\index{Ward-Verfahren} basiert.
+
+Von der feinsten Merkmalseinteilung ausgegangen werden sukzessive Merkmale zu Klassen zusammengefasst („fusioniert“), so dass in jedem Schritt ein Homogenitätsmaß (in der Regel aus der Familie der $L_q$-Distanzen) minimal verschlechtert wird.
+
+Für die  $L_2$-Distanz (entspricht der Fehlerquadratsumme) ist die Homogenität einer Partition mit $G$  Clustern mit jeweils  $n_g$  Elementen mit den Beobachtungsgewichten $w_i$   durch
+
+\begin{eqnarray} 
+L_2 = \sum_{g=1}^G  \sum_{i=1}^{n_g}  w_i (y_i - \mu_g)^2
+\end{eqnarray}
+
+gegeben. 
+
+Der Homogenitätsverlust in einem Schritt durch die Fusionierung zweier Cluster $c_p$  und $c_q$  mit jeweiliger Summe der Beobachtungsgewichte $w_p$  bzw. $w_q$  
+
+\begin{eqnarray} 
+L_2^G - L_2^{G-1} = \frac   {n_p W_p n_q W_q}   {n_p W_p + n_q W_q} (\mu_q - \mu_p)^2
+\end{eqnarray}
+ 
+ist über alle möglichen $G \cdot \frac{(G-1)}{2}$ Fusionen dieses Schrittes zu minimieren. Das Verfahren von Ward wird allgemein als ein sehr guter Fusionierungsalgorithmus angesehen. Um bereits vor der Clusterung den Einfluss anderer Tarifmerkmale mit zu berücksichtigen, können die Schadenbedarfsindizes vorher über diese Merkmale gewichtet werden.
+ 
+Clusterverfahren beinhalten in der Regel kein inhärentes Optimierungskriterium zur Bestimmung einer \textit{optimalen} Clusterzahl. Bei der Bestimmung der optimalen Clusterzahl sind nicht so sehr formale, sondern mehr inhaltliche Kriterien von Bedeutung. Oft schreibt die Aufgabenstellung sogar eine weitgehend feste Anzahl von Clustern vor.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
